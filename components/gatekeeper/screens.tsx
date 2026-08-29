@@ -130,6 +130,9 @@ export function WaitingScreen({
         Choose what ships. Gatekeeper opens one pull request — and only after you say so.
       </p>
 
+      <div className="gk-ledger__hint">
+        Tap a row to include or exclude it — {selectedCount} of {upgrades.length} selected
+      </div>
       <UpgradeLedger upgrades={upgrades} onToggle={onToggle} />
 
       <div className={selectedCount > 0 ? "gk-warn gk-warn--open" : "gk-warn"}>
