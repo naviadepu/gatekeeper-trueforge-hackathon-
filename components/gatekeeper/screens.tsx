@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-import { BRANCH, PR_NUMBER, REPO, TRACE, type Upgrade } from "./data";
+import { BRANCH, REPO, type Upgrade } from "./data";
+import type { PendingPr, TraceRow } from "@/lib/trueforge/protocol";
 import { Gate } from "./gate";
 import { CheckIcon, LockIcon, WarningIcon } from "./icons";
 import { Trace } from "./trace";
@@ -34,66 +33,76 @@ function Seg({ right }: { right: string }) {
   );
 }
 
-/* ------------------------------------------------------------- working screen */
+function stepCount(rows: TraceRow[]): string {
+  if (rows.length === 0) return "no steps yet";
+  const done = rows.filter((r) => r.status !== "running").length;
+  return `${done} / ${rows.length} done`;
+}
 
-/**
- * The agent at work. Reveals the trace one row at a time, runs the build-check
- * meter to 100%, then — after a beat — calls `onComplete` to present the gate.
- */
-export function WorkingScreen({ onComplete }: { onComplete: () => void }) {
-  const [shown, setShown] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const done = progress >= 100;
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+function Notes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  return <p className="gk-lead">{notes[notes.length - 1]}</p>;
+}
 
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setShown(1), 350),
-      setTimeout(() => setShown(2), 1250),
-      setTimeout(() => setShown(3), 2200),
-      setTimeout(() => {
-        intervalRef.current = setInterval(() => {
-          setProgress((p) => Math.min(100, p + 3 + Math.random() * 7));
-        }, 170);
-      }, 2500),
-    ];
-    return () => {
-      timers.forEach(clearTimeout);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
+/* -------------------------------------------------------------- start screen */
 
-  // Stop the meter once it's full.
-  useEffect(() => {
-    if (progress >= 100 && intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, [progress]);
-
-  // Hand off to the gate a beat after the build finishes.
-  useEffect(() => {
-    if (!done) return;
-    const t = setTimeout(onComplete, 1400);
-    return () => clearTimeout(t);
-  }, [done, onComplete]);
-
+export function StartScreen({ repo, onStart }: { repo: string; onStart: () => void }) {
   return (
     <>
-      <KRow status={done ? "complete" : "in progress"} live />
-      <h1 key={done ? "ready" : "run"} className="gk-headline">
-        {done ? "handing this\nto you." : "running checks\nin the sandbox."}
+      <KRow status="idle" />
+      <h1 className="gk-headline">{"ready when\nyou are."}</h1>
+
+      <p className="gk-lead">
+        Gatekeeper audits <u>{repo}</u> for vulnerable dependencies in a sandbox, then shows you
+        exactly what it wants to change — before it opens a single pull request.
+      </p>
+
+      <Gate variant="primed" label="Start the audit" />
+
+      <div className="gk-acts">
+        <button type="button" className="gk-approve" onClick={onStart}>
+          Audit {repo.split("/").pop()}
+        </button>
+      </div>
+
+      <div className="gk-locked">
+        <div className="gk-locked__k">
+          <LockIcon /> Nothing runs until you press the button
+        </div>
+        <div className="gk-locked__row">
+          <span className="gk-ring" /> Read package.json and run npm audit in a sandbox
+        </div>
+        <div className="gk-locked__row">
+          <span className="gk-ring" /> Open a pull request — only after you approve it
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------- working screen */
+
+export function WorkingScreen({
+  rows,
+  notes,
+  opening = false,
+}: {
+  rows: TraceRow[];
+  notes: string[];
+  opening?: boolean;
+}) {
+  return (
+    <>
+      <KRow status={opening ? "opening pr" : "auditing"} live />
+      <h1 className="gk-headline">
+        {opening ? "applying your\napproved set." : "running checks\nin the sandbox."}
       </h1>
 
-      <Seg right={`${shown} / ${TRACE.length}`} />
-      <Trace
-        steps={TRACE}
-        shown={shown}
-        runningId={done ? undefined : "build"}
-        progress={progress}
-      />
+      <Seg right={stepCount(rows)} />
+      <Trace rows={rows} />
+      <Notes notes={notes} />
 
-      <Gate variant={done ? "open" : "ahead"} label={done ? "Your review →" : "Your review"} />
+      <Gate variant="ahead" label={opening ? "Toward the pull request" : "Your review"} />
     </>
   );
 }
@@ -102,16 +111,22 @@ export function WorkingScreen({ onComplete }: { onComplete: () => void }) {
 
 export function WaitingScreen({
   upgrades,
+  summary,
   selectedCount,
+  rows,
   tense,
+  busy,
   onToggle,
   onTenseChange,
   onApprove,
   onDecline,
 }: {
   upgrades: Upgrade[];
+  summary: string;
   selectedCount: number;
+  rows: TraceRow[];
   tense: boolean;
+  busy: boolean;
   onToggle: (id: string) => void;
   onTenseChange: (tense: boolean) => void;
   onApprove: () => void;
@@ -122,11 +137,12 @@ export function WaitingScreen({
       <KRow status="holding" />
       <h1 className="gk-headline">{"waiting for\nyour word."}</h1>
 
-      <Seg right={`${TRACE.length} / ${TRACE.length} done`} />
-      <Trace steps={TRACE} />
+      <Seg right={stepCount(rows)} />
+      <Trace rows={rows} />
 
       <Gate variant="primed" tense={tense} label="The gate" />
       <p className="gk-lead">
+        {summary ? `${summary} ` : ""}
         Choose what ships. Gatekeeper opens one pull request — and only after you say so.
       </p>
 
@@ -135,14 +151,16 @@ export function WaitingScreen({
       <div className={selectedCount > 0 ? "gk-warn gk-warn--open" : "gk-warn"}>
         <WarningIcon />
         <span>
-          Approving opens a pull request on <u>{REPO}</u> — the one step Gatekeeper can’t take
-          back. Nothing merges without a second human review.
+          Approving sends the selected upgrades to the agent, which opens a pull request on{" "}
+          <u>{REPO}</u> — the one step it pauses to ask about. Nothing merges without a second human
+          review.
         </span>
       </div>
 
       <ApproveBar
         count={selectedCount}
         max={upgrades.length}
+        busy={busy}
         onApprove={onApprove}
         onDecline={onDecline}
         onTenseChange={onTenseChange}
@@ -153,11 +171,66 @@ export function WaitingScreen({
           <LockIcon /> Locked until you approve
         </div>
         <div className="gk-locked__row">
-          <span className="gk-ring" /> Open pull request from {BRANCH}
+          <span className="gk-ring" /> Apply the upgrades on {BRANCH} and re-run the build
         </div>
         <div className="gk-locked__row">
-          <span className="gk-ring" /> Post the audit summary as a PR comment
+          <span className="gk-ring" /> Open the pull request — with a final confirm from you
         </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------------------------------------------------------- confirming screen */
+
+export function ConfirmScreen({
+  pr,
+  rows,
+  notes,
+  busy,
+  onConfirm,
+  onDecline,
+}: {
+  pr: PendingPr;
+  rows: TraceRow[];
+  notes: string[];
+  busy: boolean;
+  onConfirm: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <>
+      <KRow status="awaiting confirm" live />
+      <h1 className="gk-headline">{"one call\nfrom open."}</h1>
+
+      <Seg right={stepCount(rows)} />
+      <Trace rows={rows} />
+      <Notes notes={notes} />
+
+      <Gate variant="primed" tense label="TrueForge is holding at create_pull_request" />
+
+      <p className="gk-lead">
+        The agent built the branch and wants to open this pull request. It has stopped and is waiting
+        for you.
+      </p>
+
+      <div className="gk-manifest">
+        <div>
+          <b>{pr.title}</b>
+        </div>
+        <div>
+          {pr.head || BRANCH} <i>→</i> {pr.base || "main"}
+        </div>
+        {pr.body ? <div className="gk-pr-body">{pr.body}</div> : null}
+      </div>
+
+      <div className="gk-acts">
+        <button type="button" className="gk-approve" disabled={busy} onClick={onConfirm}>
+          {busy ? "Opening…" : "Confirm & open PR"}
+        </button>
+        <button type="button" className="gk-decline" disabled={busy} onClick={onDecline}>
+          Cancel
+        </button>
       </div>
     </>
   );
@@ -168,31 +241,41 @@ export function WaitingScreen({
 export function DoneScreen({
   approved,
   skipped,
+  pr,
+  rows,
   onReset,
 }: {
   approved: Upgrade[];
   skipped: Upgrade[];
+  pr: { url: string; number: number | null } | null;
+  rows: TraceRow[];
   onReset: () => void;
 }) {
   const count = approved.length;
 
   return (
     <>
-      <KRow status="resolved" />
+      <KRow status={pr?.number ? `pr open · ${pr.number}` : "resolved"} />
       <h1 className="gk-headline">{"the gate\nis open."}</h1>
 
-      <Seg right={`${TRACE.length} / ${TRACE.length} done`} />
-      <Trace steps={TRACE} />
+      <Seg right={stepCount(rows)} />
+      <Trace rows={rows} />
 
       <Gate variant="open" label="Gate cleared — approved by you" />
 
       <div className="gk-manifest">
         <div>
-          <b>PR #{PR_NUMBER}</b>&nbsp;&nbsp;{BRANCH} <i>→</i> main
+          {pr ? (
+            <a href={pr.url} target="_blank" rel="noreferrer">
+              <b>{pr.number ? `PR #${pr.number}` : "Pull request"}</b>
+            </a>
+          ) : (
+            <b>Pull request opened</b>
+          )}
+          &nbsp;&nbsp;{BRANCH} <i>→</i> main
         </div>
         <div>
-          <span className="gk-add">+4</span> <span className="gk-del">−4</span>&nbsp;&nbsp;{count}{" "}
-          {count === 1 ? "upgrade" : "upgrades"} · awaiting second review
+          {count} {count === 1 ? "upgrade" : "upgrades"} applied · awaiting second review
         </div>
       </div>
 
@@ -216,10 +299,10 @@ export function DoneScreen({
       <div className="gk-locked gk-locked--lit">
         <div className="gk-locked__k">Done</div>
         <div className="gk-locked__row">
-          <span className="gk-ring" /> Pull request opened from {BRANCH}
+          <span className="gk-ring" /> Upgrades applied on {BRANCH}
         </div>
         <div className="gk-locked__row">
-          <span className="gk-ring" /> Audit summary posted as a PR comment
+          <span className="gk-ring" /> Pull request opened for a second human review
         </div>
       </div>
 
@@ -229,7 +312,7 @@ export function DoneScreen({
       </p>
       <div className="gk-again">
         <button type="button" className="gk-decline" onClick={onReset}>
-          ← Replay from the gate
+          ← Run another audit
         </button>
       </div>
     </>
@@ -238,24 +321,44 @@ export function DoneScreen({
 
 /* ------------------------------------------------------------ declined screen */
 
-export function DeclinedScreen({ onReset }: { onReset: () => void }) {
+export function DeclinedScreen({ rows, onReset }: { rows: TraceRow[]; onReset: () => void }) {
   return (
     <>
       <KRow status="closed" />
       <h1 className="gk-headline">{"held at\nthe gate."}</h1>
 
-      <Seg right={`${TRACE.length} / ${TRACE.length} done`} />
-      <Trace steps={TRACE} />
+      <Seg right={stepCount(rows)} />
+      <Trace rows={rows} />
 
       <Gate variant="stop" label="Held at the gate — nothing opened" />
 
       <p className="gk-declined">
-        The run is closed. No pull request, no branch, no change on {REPO}. Re-run the audit
-        whenever you want another look.
+        The run is closed. No pull request, no branch pushed to {REPO}. Re-run the audit whenever you
+        want another look.
       </p>
       <div className="gk-again">
         <button type="button" className="gk-decline" onClick={onReset}>
-          ← Back to the gate
+          ← Back to the start
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- error screen */
+
+export function ErrorScreen({ message, onReset }: { message: string; onReset: () => void }) {
+  return (
+    <>
+      <KRow status="error" />
+      <h1 className="gk-headline">{"the run\nstopped."}</h1>
+
+      <Gate variant="stop" label="Run halted — nothing opened" />
+
+      <p className="gk-declined">{message}</p>
+      <div className="gk-again">
+        <button type="button" className="gk-decline" onClick={onReset}>
+          ← Back to the start
         </button>
       </div>
     </>

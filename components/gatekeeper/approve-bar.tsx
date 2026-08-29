@@ -6,12 +6,14 @@
 export function ApproveBar({
   count,
   max,
+  busy = false,
   onApprove,
   onDecline,
   onTenseChange,
 }: {
   count: number;
   max: number;
+  busy?: boolean;
   onApprove: () => void;
   onDecline: () => void;
   onTenseChange: (tense: boolean) => void;
@@ -23,26 +25,32 @@ export function ApproveBar({
       <button
         type="button"
         className="gk-approve"
-        disabled={count === 0}
+        disabled={count === 0 || busy}
         onClick={onApprove}
         onMouseEnter={() => onTenseChange(true)}
         onMouseLeave={() => onTenseChange(false)}
         onFocus={() => onTenseChange(true)}
         onBlur={() => onTenseChange(false)}
       >
-        Approve{" "}
-        <span className="gk-odo">
-          <span className="gk-odo__s" style={{ transform: `translateY(-${count}em)` }}>
-            {Array.from({ length: max + 1 }, (_, d) => (
-              <span key={d} className="gk-odo__d">
-                {d}
+        {busy ? (
+          "Sending to the agent…"
+        ) : (
+          <>
+            Approve{" "}
+            <span className="gk-odo">
+              <span className="gk-odo__s" style={{ transform: `translateY(-${count}em)` }}>
+                {Array.from({ length: max + 1 }, (_, d) => (
+                  <span key={d} className="gk-odo__d">
+                    {d}
+                  </span>
+                ))}
               </span>
-            ))}
-          </span>
-        </span>{" "}
-        {noun}
+            </span>{" "}
+            {noun}
+          </>
+        )}
       </button>
-      <button type="button" className="gk-decline" onClick={onDecline}>
+      <button type="button" className="gk-decline" disabled={busy} onClick={onDecline}>
         Decline
       </button>
     </div>

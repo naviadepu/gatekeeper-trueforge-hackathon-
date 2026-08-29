@@ -1,107 +1,123 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import "./gatekeeper.css";
-import { INITIAL_UPGRADES, type Phase } from "./data";
+import { REPO } from "./data";
 import { Atmosphere, type Pulse } from "./atmosphere";
 import { InstrumentFrame } from "./frame";
-import { DeclinedScreen, DoneScreen, WaitingScreen, WorkingScreen } from "./screens";
+import { useAgentRun } from "./use-agent-run";
+import {
+  ConfirmScreen,
+  DeclinedScreen,
+  DoneScreen,
+  ErrorScreen,
+  StartScreen,
+  WaitingScreen,
+  WorkingScreen,
+} from "./screens";
 
-const STATE_CODE: Record<Phase, string> = {
-  working: "working",
+const STATE_CODE: Record<string, string> = {
+  idle: "standing by",
+  working: "auditing · sandbox",
   waiting: "awaiting human",
-  done: "pr open · 12",
+  confirming: "paused · create_pull_request",
+  opening: "opening pull request",
+  done: "pr open",
   declined: "run closed",
+  error: "run halted",
 };
 
 /**
- * Top-level state container. Holds the phase, the upgrade selections, and two
- * bits of transient feedback state (`tense` = Approve is hovered, `pulse` =
- * one-shot atmosphere flash). Everything visual lives in the screen components.
+ * Top-level container. All agent state lives in `useAgentRun` (which drives it
+ * from TrueForge's SSE stream); this component only owns two bits of transient
+ * UI feedback — `tense` (Approve is hovered) and `pulse` (atmosphere flash).
  */
 export function Gatekeeper() {
-  const [phase, setPhase] = useState<Phase>("working");
-  const [upgrades, setUpgrades] = useState(INITIAL_UPGRADES);
+  const run = useAgentRun();
   const [tense, setTense] = useState(false);
   const [pulse, setPulse] = useState<Pulse>({ key: 0, kind: null });
 
-  const selectedCount = upgrades.filter((u) => u.selected).length;
+  const selectedCount = run.upgrades.filter((u) => u.selected).length;
+  const approved = useMemo(() => run.upgrades.filter((u) => u.selected), [run.upgrades]);
+  const skipped = useMemo(() => run.upgrades.filter((u) => !u.selected), [run.upgrades]);
 
-  const toggle = useCallback((id: string) => {
-    setUpgrades((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, selected: !u.selected } : u)),
-    );
+  // Flash the atmosphere on each toggle / when the gate opens.
+  const prevPhase = useRef(run.phase);
+  useEffect(() => {
+    if (run.phase !== prevPhase.current && run.phase === "done") {
+      setPulse((p) => ({ key: p.key + 1, kind: "flash" }));
+    }
+    prevPhase.current = run.phase;
+  }, [run.phase]);
+
+  const toggle = (id: string) => {
+    run.toggle(id);
     setPulse((p) => ({ key: p.key + 1, kind: "tick" }));
-  }, []);
-
-  const approve = useCallback(() => {
-    setPulse((p) => ({ key: p.key + 1, kind: "flash" }));
-    setTense(false);
-    setPhase("done");
-  }, []);
-
-  const decline = useCallback(() => {
-    setTense(false);
-    setPhase("declined");
-  }, []);
-
-  const reset = useCallback(() => setPhase("waiting"), []);
-
-  const approved = useMemo(() => upgrades.filter((u) => u.selected), [upgrades]);
-  const skipped = useMemo(() => upgrades.filter((u) => !u.selected), [upgrades]);
+  };
 
   return (
     <main className="gk">
       <Atmosphere pulse={pulse} />
-      <InstrumentFrame stateCode={STATE_CODE[phase]} />
+      <InstrumentFrame stateCode={STATE_CODE[run.phase] ?? run.phase} />
 
       <div className="gk-wrap">
-        {phase === "working" && <WorkingScreen onComplete={reset} />}
-        {phase === "waiting" && (
+        {run.phase === "idle" && <StartScreen repo={REPO} onStart={() => run.start()} />}
+
+        {run.phase === "working" && <WorkingScreen rows={run.trace} notes={run.notes} />}
+
+        {run.phase === "opening" && (
+          <WorkingScreen rows={run.trace} notes={run.notes} opening />
+        )}
+
+        {run.phase === "waiting" && (
           <WaitingScreen
-            upgrades={upgrades}
+            upgrades={run.upgrades}
+            summary={run.summary}
             selectedCount={selectedCount}
+            rows={run.trace}
             tense={tense}
+            busy={run.busy}
             onToggle={toggle}
             onTenseChange={setTense}
-            onApprove={approve}
-            onDecline={decline}
+            onApprove={() => {
+              setTense(false);
+              run.approve();
+            }}
+            onDecline={() => {
+              setTense(false);
+              run.decline();
+            }}
           />
         )}
-        {phase === "done" && (
-          <DoneScreen approved={approved} skipped={skipped} onReset={reset} />
+
+        {run.phase === "confirming" && run.pendingPr && (
+          <ConfirmScreen
+            pr={run.pendingPr}
+            rows={run.trace}
+            notes={run.notes}
+            busy={run.busy}
+            onConfirm={() => run.approve()}
+            onDecline={() => run.decline()}
+          />
         )}
-        {phase === "declined" && <DeclinedScreen onReset={reset} />}
+
+        {run.phase === "done" && (
+          <DoneScreen
+            approved={approved}
+            skipped={skipped}
+            pr={run.pr}
+            rows={run.trace}
+            onReset={run.reset}
+          />
+        )}
+
+        {run.phase === "declined" && <DeclinedScreen rows={run.trace} onReset={run.reset} />}
+
+        {run.phase === "error" && (
+          <ErrorScreen message={run.error ?? "Something went wrong."} onReset={run.reset} />
+        )}
       </div>
-
-      <PhaseSwitcher phase={phase} onSelect={setPhase} />
     </main>
-  );
-}
-
-/** Dev-only: jump between phases without waiting for the flow. */
-function PhaseSwitcher({
-  phase,
-  onSelect,
-}: {
-  phase: Phase;
-  onSelect: (p: Phase) => void;
-}) {
-  const phases: Phase[] = ["working", "waiting", "done", "declined"];
-  return (
-    <div className="gk-dev">
-      <span className="gk-dev__tag">dev</span>
-      {phases.map((p) => (
-        <button
-          key={p}
-          type="button"
-          className={p === phase ? "gk-dev__btn gk-dev__btn--on" : "gk-dev__btn"}
-          onClick={() => onSelect(p)}
-        >
-          {p}
-        </button>
-      ))}
-    </div>
   );
 }

@@ -1,46 +1,36 @@
-import type { TraceStep } from "./data";
-import { CheckIcon, SpinnerIcon } from "./icons";
+import type { TraceRow } from "@/lib/trueforge/protocol";
+import { CheckIcon, SpinnerIcon, WarningIcon } from "./icons";
 
 type TraceProps = {
-  steps: TraceStep[];
-  /** How many rows to reveal — the working screen counts this up. Default: all. */
-  shown?: number;
-  /** Step id that is still running: shows a spinner + progress bar instead of a check. */
-  runningId?: string;
-  /** 0–100 progress for the running step. */
-  progress?: number;
+  /** The agent's real tool-call ledger, streamed from TrueForge. */
+  rows: TraceRow[];
 };
 
 /**
  * The trace ledger — the running record of what the agent has done. Rows are
- * keyed by id so a newly-revealed row mounts fresh and plays its rise-in.
- * No box; a hairline rail runs down the icon gutter.
+ * keyed by id so a newly-streamed row mounts fresh and plays its rise-in.
+ * A hairline rail runs down the icon gutter.
  */
-export function Trace({ steps, shown = steps.length, runningId, progress = 0 }: TraceProps) {
+export function Trace({ rows }: TraceProps) {
   return (
     <div className="gk-trace">
-      {steps.slice(0, shown).map((step) => {
-        const running = step.id === runningId;
+      {rows.map((row) => {
+        const running = row.status === "running";
         return (
-          <div key={step.id} className={running ? "gk-trow gk-trow--now" : "gk-trow"}>
+          <div key={row.id} className={running ? "gk-trow gk-trow--now" : "gk-trow"}>
             <span className="gk-trow__i">
-              {running ? <SpinnerIcon className="gk-spin" /> : <CheckIcon />}
-            </span>
-            <span className="gk-trow__t">
-              <b>{step.verb}</b> {step.label}
-            </span>
-            <span className="gk-trow__m">
               {running ? (
-                <>
-                  <span className="gk-pbar">
-                    <span className="gk-pbar__f" style={{ width: `${progress}%` }} />
-                  </span>
-                  <span className="gk-pct">{Math.round(progress)}%</span>
-                </>
+                <SpinnerIcon className="gk-spin" />
+              ) : row.status === "failed" ? (
+                <WarningIcon />
               ) : (
-                step.meta
+                <CheckIcon />
               )}
             </span>
+            <span className="gk-trow__t">
+              <b>{row.verb}</b> {row.label}
+            </span>
+            <span className="gk-trow__m">{row.meta}</span>
           </div>
         );
       })}
