@@ -60,11 +60,19 @@ export function Gatekeeper() {
   const openGate = useCallback(() => {
     setGateOpening(true);
     setPulse((p) => ({ key: p.key + 1, kind: "flash" }));
+  }, []);
+
+  // Kick off the run once the gate has had time to open. Keyed on the flag so
+  // the timer is cleared if the component unmounts (or resets) mid-animation.
+  const start = run.start;
+  useEffect(() => {
+    if (!gateOpening) return;
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    window.setTimeout(() => run.start(), reduced ? 0 : 420);
-  }, [run]);
+    const t = window.setTimeout(start, reduced ? 0 : 420);
+    return () => window.clearTimeout(t);
+  }, [gateOpening, start]);
 
   const resetRun = useCallback(() => {
     setGateOpening(false);
