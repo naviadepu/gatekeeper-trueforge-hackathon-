@@ -7,6 +7,7 @@ import { REPO } from "./data";
 import { Atmosphere, type Pulse } from "./atmosphere";
 import { InstrumentFrame } from "./frame";
 import { useAgentRun } from "./use-agent-run";
+import { BootGate } from "./boot-gate";
 import {
   ConfirmScreen,
   DeclinedScreen,
@@ -43,6 +44,16 @@ export function Gatekeeper() {
   const [curtain, setCurtain] = useState(0);
   // The very first click swings the on-screen gate open before the run starts.
   const [gateOpening, setGateOpening] = useState(false);
+  // The intro: a diamond splits open onto the app, once, on load.
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const t = window.setTimeout(() => setBooting(false), reduced ? 0 : 1500);
+    return () => window.clearTimeout(t);
+  }, []);
 
   /** Run `act` and part the curtain over the transition it triggers. */
   const withCurtain = useCallback((act: () => void) => {
@@ -168,6 +179,8 @@ export function Gatekeeper() {
           <span />
         </div>
       )}
+
+      {booting && <BootGate />}
     </main>
   );
 }

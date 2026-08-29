@@ -1172,6 +1172,148 @@
   }
 }
 
+/* --------------------------------------------- intro: the gate opens on load */
+
+/* A diamond traces itself in the dark, a seam lights down its middle, and its
+ * two halves swing apart — the veil lifts onto the app. Plays once, ~1.5s. */
+.gk-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: #121a30;
+  pointer-events: none;
+  animation: gk-boot-veil 1.5s cubic-bezier(0.55, 0, 0.1, 1) forwards;
+}
+@keyframes gk-boot-veil {
+  0%,
+  58% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.gk-boot__mark {
+  width: 148px;
+  height: 148px;
+  overflow: visible;
+}
+.gk-boot__edge {
+  stroke: var(--gk-glow);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 250;
+  filter: drop-shadow(0 0 8px rgba(207, 217, 255, 0.75));
+}
+.gk-boot__edge--l {
+  animation:
+    gk-boot-trace 0.5s ease-out both,
+    gk-boot-part-l 0.62s cubic-bezier(0.5, 0, 0.15, 1) 0.72s both;
+}
+.gk-boot__edge--r {
+  animation:
+    gk-boot-trace 0.5s ease-out both,
+    gk-boot-part-r 0.62s cubic-bezier(0.5, 0, 0.15, 1) 0.72s both;
+}
+@keyframes gk-boot-trace {
+  0% {
+    stroke-dashoffset: 250;
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+@keyframes gk-boot-part-l {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  22% {
+    filter: drop-shadow(0 0 22px rgba(207, 217, 255, 1));
+  }
+  100% {
+    transform: translateX(-96px);
+    opacity: 0;
+  }
+}
+@keyframes gk-boot-part-r {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  22% {
+    filter: drop-shadow(0 0 22px rgba(207, 217, 255, 1));
+  }
+  100% {
+    transform: translateX(96px);
+    opacity: 0;
+  }
+}
+.gk-boot__seam {
+  stroke: #fff;
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 14px var(--gk-glow));
+  animation: gk-boot-seam 0.82s ease-out 0.64s both;
+}
+@keyframes gk-boot-seam {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.28);
+  }
+  26% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(1.18);
+  }
+}
+.gk-boot__word {
+  font-family: var(--gk-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  text-transform: uppercase;
+  color: var(--gk-glow);
+  animation: gk-boot-word 1.35s ease-out both;
+}
+@keyframes gk-boot-word {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.2em;
+  }
+  26% {
+    opacity: 0.85;
+    letter-spacing: 0.5em;
+  }
+  55% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    letter-spacing: 0.82em;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gk *,
   .gk *::before,
@@ -1184,6 +1326,11 @@
    * animation collapsed they never cover anything. The dimmed trace and the
    * gate's final state still apply (static end states, no motion). */
   .gk-curtain {
+    display: none;
+  }
+  /* Skip the intro veil — collapsed animation lands on its hidden end state,
+   * and Gatekeeper unmounts it immediately anyway. */
+  .gk-boot {
     display: none;
   }
 }
