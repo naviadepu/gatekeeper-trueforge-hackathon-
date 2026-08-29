@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./gatekeeper.css";
 import { REPO } from "./data";
@@ -37,6 +37,22 @@ export function Gatekeeper() {
   const run = useAgentRun();
   const [tense, setTense] = useState(false);
   const [pulse, setPulse] = useState<Pulse>({ key: 0, kind: null });
+  // Bump-counter for the "curtain" that parts when you commit to an action
+  // (start the audit, approve the set, confirm the PR). Keyed so each click
+  // remounts and replays it; cleared on animationend, with a timeout fallback.
+  const [curtain, setCurtain] = useState(0);
+
+  /** Run `act` and part the curtain over the transition it triggers. */
+  const withCurtain = useCallback((act: () => void) => {
+    setCurtain((n) => n + 1);
+    act();
+  }, []);
+
+  useEffect(() => {
+    if (!curtain) return;
+    const t = setTimeout(() => setCurtain(0), 750);
+    return () => clearTimeout(t);
+  }, [curtain]);
 
   const selectedCount = run.upgrades.filter((u) => u.selected).length;
   const approved = useMemo(() => run.upgrades.filter((u) => u.selected), [run.upgrades]);
@@ -61,8 +77,10 @@ export function Gatekeeper() {
       <Atmosphere pulse={pulse} />
       <InstrumentFrame stateCode={STATE_CODE[run.phase] ?? run.phase} />
 
-      <div className="gk-wrap">
-        {run.phase === "idle" && <StartScreen repo={REPO} onStart={() => run.start()} />}
+      <div className={`gk-wrap gk-wrap--${run.phase}`}>
+        {run.phase === "idle" && (
+          <StartScreen repo={REPO} onStart={() => withCurtain(() => run.start())} />
+        )}
 
         {run.phase === "working" && <WorkingScreen rows={run.trace} notes={run.notes} />}
 
@@ -82,7 +100,7 @@ export function Gatekeeper() {
             onTenseChange={setTense}
             onApprove={() => {
               setTense(false);
-              run.approve();
+              withCurtain(() => run.approve());
             }}
             onDecline={() => {
               setTense(false);
@@ -97,7 +115,7 @@ export function Gatekeeper() {
             rows={run.trace}
             notes={run.notes}
             busy={run.busy}
-            onConfirm={() => run.approve()}
+            onConfirm={() => withCurtain(() => run.approve())}
             onDecline={() => run.decline()}
           />
         )}
@@ -118,6 +136,13 @@ export function Gatekeeper() {
           <ErrorScreen message={run.error ?? "Something went wrong."} onReset={run.reset} />
         )}
       </div>
+
+      {curtain > 0 && (
+        <div key={curtain} className="gk-curtain" aria-hidden onAnimationEnd={() => setCurtain(0)}>
+          <span />
+          <span />
+        </div>
+      )}
     </main>
   );
 }

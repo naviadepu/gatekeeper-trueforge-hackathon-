@@ -958,6 +958,132 @@
   }
 }
 
+/* ---------------------------------------------- handoff: agent → human */
+
+/* When the flow settles on the gate, the completed trace recedes so the
+ * gate and the choice come forward — control visibly passes to the human. */
+.gk-wrap--waiting .gk-trace {
+  opacity: 0.6;
+  filter: saturate(0.92);
+  transition: opacity 0.42s ease, filter 0.42s ease;
+}
+.gk-wrap--waiting .gk-gate {
+  animation: gk-gate-forward 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* The approval controls arrive instantly and sit still — the Approve button
+ * gets one soft glow, no motion, no loop. */
+.gk-wrap--waiting .gk-acts {
+  animation: none;
+}
+.gk-wrap--waiting .gk-approve:not(:disabled) {
+  animation: gk-approve-pulse 0.42s ease-out 0.16s 1;
+}
+
+@keyframes gk-gate-forward {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.975);
+    filter: brightness(0.7);
+  }
+  60% {
+    filter: brightness(1.35);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: brightness(1);
+  }
+}
+@keyframes gk-approve-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(207, 217, 255, 0);
+  }
+  45% {
+    box-shadow: 0 0 34px 6px rgba(207, 217, 255, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(207, 217, 255, 0);
+  }
+}
+
+/* ------------------------------------------ curtain: opening something */
+
+/* Two panels sweep in to meet at a glowing seam, hold a beat, then part —
+ * a threshold closing over the old view and opening onto what comes next.
+ * Fires on: start the audit, approve the set, confirm the pull request. */
+.gk-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  pointer-events: none;
+}
+.gk-curtain > span {
+  flex: 1 1 50%;
+  background: linear-gradient(180deg, #1c2648, #131a30);
+  will-change: transform;
+}
+.gk-curtain > span:first-child {
+  box-shadow: inset -60px 0 80px -30px rgba(8, 12, 26, 0.7), 3px 0 30px rgba(207, 217, 255, 0.55);
+  animation: gk-curtain-l 0.56s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.gk-curtain > span:last-child {
+  box-shadow: inset 60px 0 80px -30px rgba(8, 12, 26, 0.7), -3px 0 30px rgba(207, 217, 255, 0.55);
+  animation: gk-curtain-r 0.56s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.gk-curtain::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, transparent, var(--gk-glow), transparent);
+  box-shadow: 0 0 24px 4px rgba(207, 217, 255, 0.7);
+  opacity: 0;
+  animation: gk-curtain-seam 0.56s ease-out both;
+}
+@keyframes gk-curtain-l {
+  0% {
+    transform: translateX(-101%);
+  }
+  34%,
+  46% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-101%);
+  }
+}
+@keyframes gk-curtain-r {
+  0% {
+    transform: translateX(101%);
+  }
+  34%,
+  46% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(101%);
+  }
+}
+@keyframes gk-curtain-seam {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gk *,
   .gk *::before,
@@ -965,6 +1091,12 @@
     animation-duration: 0.001ms !important;
     animation-delay: 0 !important;
     transition-duration: 0.001ms !important;
+  }
+  /* Skip the curtain entirely — the panels start off-screen, so with the
+   * animation collapsed they never cover anything. The dimmed trace and the
+   * gate's final state still apply (static end states, no motion). */
+  .gk-curtain {
+    display: none;
   }
 }
 
