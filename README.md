@@ -21,5 +21,8 @@ Qodo's high-level assessment additionally endorsed keeping the prototype in one 
 page with local state rather than introducing a state-machine library, noting that the
 indirection would be premature before the interaction model settled. I agreed and kept
 the simpler structure.
+<img width="808" height="732" alt="Screenshot 2026-08-29 at 1 58 16 PM" src="https://github.com/user-attachments/assets/479ce972-cfaa-4741-a21d-a51db3fb62e2" />
+
+
 
 **Full PR history:** [all pull requests](https://github.com/naviadepu/gatekeeper-trueforge-hackathon-/pulls)
