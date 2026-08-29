@@ -148,6 +148,10 @@ export function WaitingScreen({
 
       <UpgradeLedger upgrades={upgrades} onToggle={onToggle} />
 
+      {upgrades.length > 0 && selectedCount === 0 && (
+        <p className="gk-hint">Nothing is selected — toggle at least one upgrade to open a pull request.</p>
+      )}
+
       <div className={selectedCount > 0 ? "gk-warn gk-warn--open" : "gk-warn"}>
         <WarningIcon />
         <span>
@@ -171,7 +175,7 @@ export function WaitingScreen({
           <LockIcon /> Locked until you approve
         </div>
         <div className="gk-locked__row">
-          <span className="gk-ring" /> Apply the upgrades on {BRANCH} and re-run the build
+          <span className="gk-ring" /> Apply the selected upgrades on {BRANCH}
         </div>
         <div className="gk-locked__row">
           <span className="gk-ring" /> Open the pull request — with a final confirm from you
@@ -210,8 +214,8 @@ export function ConfirmScreen({
       <Gate variant="primed" tense label="TrueForge is holding at create_pull_request" />
 
       <p className="gk-lead">
-        The agent built the branch and wants to open this pull request. It has stopped and is waiting
-        for you.
+        The agent prepared the branch and wants to open this pull request. It has stopped and is
+        waiting for you.
       </p>
 
       <div className="gk-manifest">

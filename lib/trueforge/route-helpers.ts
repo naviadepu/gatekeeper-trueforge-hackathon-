@@ -24,8 +24,9 @@ export function turnStream(
   input: TurnInputItem[],
   mode: "audit" | "openpr",
   prelude: GkEvent[] = [],
+  opts: { createPrCallId?: string } = {},
 ): Response {
-  const mapper = new RunMapper(mode);
+  const mapper = new RunMapper(mode, opts);
   const encoder = new TextEncoder();
 
   const body = new ReadableStream<Uint8Array>({

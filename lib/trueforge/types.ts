@@ -13,6 +13,8 @@ export interface McpServerRef {
   enable_tools?: ToolSelector[];
   disable_tools?: ToolSelector[];
   require_approval_for_tools?: ToolSelector[];
+  /** Load all (enabled) tool schemas upfront instead of deferred discovery. */
+  preload?: boolean;
 }
 
 export interface AgentSpec {
@@ -29,6 +31,7 @@ export interface AgentSpec {
   config?: {
     iteration_limit?: number;
     sandbox?: { enabled: boolean; file_downloads?: boolean };
+    dynamic_sub_agents?: { enabled: boolean };
   };
 }
 
@@ -72,6 +75,27 @@ export interface ModelMessageEvent {
   tool_calls?: RawToolCall[];
   finish_reason?: string | null;
   created_at: string;
+}
+
+/**
+ * Streaming delta of a `model.message`. Tool calls arrive here incrementally:
+ * the first delta for a call carries `index` + `id` + `function.name`, later
+ * deltas append `function.arguments` chunks. `finish_reason: "tool_calls"`
+ * marks the message's calls complete.
+ */
+export interface ModelMessageDeltaEvent {
+  type: "model.message.delta";
+  id: string;
+  thread_id: string;
+  content?: string | null;
+  tool_calls?: Array<{
+    index: number;
+    id?: string;
+    type?: "function";
+    function?: { name?: string; arguments?: string };
+    tool_info?: RawToolCall["tool_info"];
+  }>;
+  finish_reason?: string | null;
 }
 
 export interface ToolResponseEvent {
@@ -122,11 +146,22 @@ export interface TurnDoneEvent {
   created_at: string;
 }
 
+export interface ThreadCreatedEvent {
+  type: "thread.created";
+  id: string;
+  thread_id: string;
+  title: string;
+  agent_info?: { name?: string };
+  created_at: string;
+}
+
 export type TurnStreamEvent =
   | TurnCreatedEvent
   | SandboxCreatedEvent
   | ModelMessageEvent
+  | ModelMessageDeltaEvent
   | ToolResponseEvent
   | ToolApprovalRequiredEvent
+  | ThreadCreatedEvent
   | TurnDoneEvent
   | { type: string; [k: string]: unknown };

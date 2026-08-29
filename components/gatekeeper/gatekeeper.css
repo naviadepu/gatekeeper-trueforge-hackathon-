@@ -572,6 +572,14 @@
 
 /* ----------------------------------------------------------------- warning */
 
+.gk-hint {
+  margin: 16px 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--gk-sand);
+  animation: gk-rise 0.4s ease both;
+}
+
 .gk-warn {
   display: flex;
   gap: 11px;

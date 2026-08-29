@@ -1,5 +1,6 @@
 import { createSession, ping, TARGET_REPO } from "@/lib/trueforge/client";
 import { openPrPrompt, openPrSpec } from "@/lib/trueforge/agent-spec";
+import { fetchPackageJson, patchPackageJson } from "@/lib/trueforge/github";
 import { errorStream, turnStream } from "@/lib/trueforge/route-helpers";
 import type { TurnInputItem } from "@/lib/trueforge/types";
 
@@ -40,13 +41,30 @@ export async function POST(request: Request) {
     if (!Array.isArray(body.upgrades) || body.upgrades.length === 0) {
       return errorStream("No upgrades were selected.");
     }
+    const repo = body.repo ?? TARGET_REPO;
+
+    // Compute the patched package.json here — small models can't reproduce a
+    // whole file verbatim, so the agent gets the exact bytes to commit.
+    let patched: string;
+    let baseSha: string;
+    try {
+      const { content, sha } = await fetchPackageJson(repo);
+      patched = patchPackageJson(
+        content,
+        body.upgrades.map((u) => ({ name: u.name, to: u.to })),
+      );
+      baseSha = sha;
+    } catch (err) {
+      return errorStream(err instanceof Error ? err.message : "Could not read the target repo's package.json.");
+    }
+
     let sessionId: string;
     try {
       sessionId = await createSession(openPrSpec());
     } catch (err) {
       return errorStream(err instanceof Error ? err.message : "Could not create a TrueForge session.");
     }
-    const prompt = openPrPrompt(body.repo ?? TARGET_REPO, body.upgrades);
+    const prompt = openPrPrompt(repo, body.upgrades, patched, baseSha);
     return turnStream(sessionId, [{ type: "user.message", content: prompt }], "openpr", [
       { kind: "session", sessionId },
       { kind: "phase", phase: "opening" },
@@ -63,7 +81,13 @@ export async function POST(request: Request) {
       tool_call_id: body.toolCallId,
       approval: { status: "allow" },
     };
-    return turnStream(body.sessionId, [resume], "openpr", [{ kind: "phase", phase: "opening" }]);
+    return turnStream(
+      body.sessionId,
+      [resume],
+      "openpr",
+      [{ kind: "phase", phase: "opening" }],
+      { createPrCallId: body.toolCallId },
+    );
   }
 
   return errorStream("Unknown approval step.");
