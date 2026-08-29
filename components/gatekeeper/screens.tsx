@@ -46,7 +46,15 @@ function Notes({ notes }: { notes: string[] }) {
 
 /* -------------------------------------------------------------- start screen */
 
-export function StartScreen({ repo, onStart }: { repo: string; onStart: () => void }) {
+export function StartScreen({
+  repo,
+  opening,
+  onStart,
+}: {
+  repo: string;
+  opening: boolean;
+  onStart: () => void;
+}) {
   return (
     <>
       <KRow status="idle" />
@@ -57,11 +65,16 @@ export function StartScreen({ repo, onStart }: { repo: string; onStart: () => vo
         exactly what it wants to change — before it opens a single pull request.
       </p>
 
-      <Gate variant="primed" label="Start the audit" />
+      <Gate variant="primed" label={opening ? "Opening" : "Start the audit"} opening={opening} />
 
       <div className="gk-acts">
-        <button type="button" className="gk-approve" onClick={onStart}>
-          Audit {repo.split("/").pop()}
+        <button
+          type="button"
+          className="gk-approve"
+          disabled={opening}
+          onClick={onStart}
+        >
+          {opening ? "Opening…" : `Audit ${repo.split("/").pop()}`}
         </button>
       </div>
 
