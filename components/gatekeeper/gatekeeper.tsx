@@ -37,10 +37,12 @@ export function Gatekeeper() {
   const run = useAgentRun();
   const [tense, setTense] = useState(false);
   const [pulse, setPulse] = useState<Pulse>({ key: 0, kind: null });
-  // Bump-counter for the "curtain" that parts when you commit to an action
-  // (start the audit, approve the set, confirm the PR). Keyed so each click
-  // remounts and replays it; cleared on animationend, with a timeout fallback.
+  // Bump-counter for the "curtain" that parts when you commit mid-flow
+  // (approve the set, confirm the PR). Keyed so each click remounts and
+  // replays it; cleared on animationend, with a timeout fallback.
   const [curtain, setCurtain] = useState(0);
+  // The very first click swings the on-screen gate open before the run starts.
+  const [gateOpening, setGateOpening] = useState(false);
 
   /** Run `act` and part the curtain over the transition it triggers. */
   const withCurtain = useCallback((act: () => void) => {
@@ -53,6 +55,29 @@ export function Gatekeeper() {
     const t = setTimeout(() => setCurtain(0), 750);
     return () => clearTimeout(t);
   }, [curtain]);
+
+  /** The first click: the gate on screen swings open, then the run begins. */
+  const openGate = useCallback(() => {
+    setGateOpening(true);
+    setPulse((p) => ({ key: p.key + 1, kind: "flash" }));
+  }, []);
+
+  // Kick off the run once the gate has had time to open. Keyed on the flag so
+  // the timer is cleared if the component unmounts (or resets) mid-animation.
+  const start = run.start;
+  useEffect(() => {
+    if (!gateOpening) return;
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const t = window.setTimeout(start, reduced ? 0 : 420);
+    return () => window.clearTimeout(t);
+  }, [gateOpening, start]);
+
+  const resetRun = useCallback(() => {
+    setGateOpening(false);
+    run.reset();
+  }, [run]);
 
   const selectedCount = run.upgrades.filter((u) => u.selected).length;
   const approved = useMemo(() => run.upgrades.filter((u) => u.selected), [run.upgrades]);
@@ -79,7 +104,7 @@ export function Gatekeeper() {
 
       <div className={`gk-wrap gk-wrap--${run.phase}`}>
         {run.phase === "idle" && (
-          <StartScreen repo={REPO} onStart={() => withCurtain(() => run.start())} />
+          <StartScreen repo={REPO} opening={gateOpening} onStart={openGate} />
         )}
 
         {run.phase === "working" && <WorkingScreen rows={run.trace} notes={run.notes} />}
@@ -126,14 +151,14 @@ export function Gatekeeper() {
             skipped={skipped}
             pr={run.pr}
             rows={run.trace}
-            onReset={run.reset}
+            onReset={resetRun}
           />
         )}
 
-        {run.phase === "declined" && <DeclinedScreen rows={run.trace} onReset={run.reset} />}
+        {run.phase === "declined" && <DeclinedScreen rows={run.trace} onReset={resetRun} />}
 
         {run.phase === "error" && (
-          <ErrorScreen message={run.error ?? "Something went wrong."} onReset={run.reset} />
+          <ErrorScreen message={run.error ?? "Something went wrong."} onReset={resetRun} />
         )}
       </div>
 
