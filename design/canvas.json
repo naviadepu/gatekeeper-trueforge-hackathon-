@@ -1,0 +1,15 @@
+{
+  "pages": [
+    { "id": "flow", "name": "Flow" },
+    { "id": "components", "name": "Components" }
+  ],
+  "artboards": [
+    { "file": "Working.dc.html", "page": "flow", "x": 0, "y": 0, "w": 1440, "h": 940, "is_interactive": true },
+    { "file": "Main.dc.html", "page": "flow", "x": 1580, "y": 0, "w": 1440, "h": 1340, "is_interactive": true },
+    { "file": "Components.dc.html", "page": "components", "x": 0, "y": 0, "w": 1440, "h": 1900 }
+  ],
+  "annotations": [
+    { "id": "flow-note", "x": 0, "y": -120, "w": 620, "text": "Left: the agent working — steps reveal one at a time, the build check ticks to 100%, then the gate lights up. Right: where it stops and asks — toggle the diamond rows (grain pulses, count rolls), then Approve to sweep the gate open, or Decline to hold it shut. The startPhase chip jumps Main straight to any state for filming." }
+  ],
+  "launch": { "view": "canvas", "page": "flow" }
+}
