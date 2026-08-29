@@ -1,7 +1,7 @@
-# gatekeeper-trueforge-hackathon-
+# ⟡ gatekeeper-trueforge-hackathon-
 An approval-gated dependency upgrade agent. Reads your repo, runs an audit in a sandbox, and asks before opening a PR. Built on TrueForge.
 
-## Qodo Code Review Evidence
+## ⟡ Qodo Code Review Evidence
 
 Every substantive change in this repo went through a branch, a pull request, and a
 Qodo review before merge. Nothing was pushed directly to `main`.
