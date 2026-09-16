@@ -26,7 +26,10 @@ export function SpinnerIcon({ size = 15, className }: IconProps) {
   );
 }
 
-/** A rotated square. `filled` swaps the outline for a solid centre. */
+/**
+ * A rotated square used as the mark inside a toggle cell. Unselected: a faint
+ * outline — the empty slot. Selected: a solid, full-strength diamond.
+ */
 export function DiamondIcon({ filled, size = 15 }: IconProps & { filled: boolean }) {
   return (
     <svg viewBox="0 0 20 20" width={size} height={size}>
@@ -38,14 +41,14 @@ export function DiamondIcon({ filled, size = 15 }: IconProps & { filled: boolean
         transform="rotate(45 10 10)"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.4}
-        style={{ opacity: filled ? 0.32 : 1 }}
+        strokeWidth={1.6}
+        style={{ opacity: filled ? 0.35 : 0.55 }}
       />
       <rect
-        x={6}
-        y={6}
-        width={8}
-        height={8}
+        x={5.5}
+        y={5.5}
+        width={9}
+        height={9}
         transform="rotate(45 10 10)"
         fill="currentColor"
         style={{ opacity: filled ? 1 : 0 }}
